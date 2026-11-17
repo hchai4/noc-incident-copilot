@@ -17,9 +17,11 @@ bootstrap()
 
 page = st.navigation(
     [
-        st.Page("app_pages/evals.py", title="Eval dashboard", icon=":material/fact_check:", default=True),
+        st.Page(
+            "app_pages/console.py", title="Dispatch console", icon=":material/support_agent:", default=True
+        ),
+        st.Page("app_pages/evals.py", title="Eval dashboard", icon=":material/fact_check:"),
         st.Page("app_pages/guardrails.py", title="Guardrail lab", icon=":material/shield:"),
-        st.Page("app_pages/console.py", title="Dispatch console", icon=":material/support_agent:"),
     ],
     position="top",
 )

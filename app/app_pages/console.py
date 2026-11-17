@@ -204,8 +204,7 @@ with col_right:
         elif checks["sla_compliance_passed"]:
             st.badge("Passed", icon=":material/check:", color="green")
             st.caption(
-                f"Next update every {draft.next_update_window_minutes} mins "
-                f"(allowed: <= {max_minutes} mins)."
+                f"Next update every {draft.next_update_window_minutes} mins (allowed: <= {max_minutes} mins)."
             )
         else:
             st.badge("Failed", icon=":material/close:", color="red")

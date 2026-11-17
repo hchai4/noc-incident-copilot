@@ -1,4 +1,3 @@
-import json
 from typing import Any
 
 import streamlit as st
@@ -9,8 +8,7 @@ from src.telemetry_db import get_circuit_details
 
 st.title("Guardrail lab")
 st.caption(
-    "No LLM here. Edit a draft the way a misbehaving model might emit it and watch two layers react: "
-    "Pydantic schema validation, then the deterministic tenant-isolation and SLA gate."
+    "No LLM. Pick a failure preset (or edit the fields) and see schema validation plus the tenant/SLA gate react."
 )
 
 CIRCUIT_ID = "IEPL-9021-LAX-TYO"
@@ -40,10 +38,8 @@ PRESETS: dict[str, dict[str, Any]] = {
     "Unknown severity": {"severity": "catastrophic"},
 }
 
-st.markdown(
-    f"**Ground truth:** `{CIRCUIT_ID}` belongs to **{circuit['client_name']}**, "
-    f"{circuit['client_tier']}, contracted SLA {circuit['contracted_sla_hours']} h "
-    f"(update window must be <= {max_min} min)."
+st.caption(
+    f"Ground truth: `{CIRCUIT_ID}` is **{circuit['client_name']}**, update window must be <= {max_min} min."
 )
 
 preset = st.segmented_control("Failure preset", list(PRESETS), default="Clean draft", key="preset")
@@ -58,47 +54,28 @@ left, right = st.columns(2, gap="large")
 with left:
     st.subheader("Model output (editable)")
     edited: dict[str, Any] = {
-        "incident_id": st.text_input("incident_id", key="f_incident_id"),
+        **BASE,
         "client_name": st.text_input("client_name", key="f_client_name"),
         "circuit_id": st.text_input("circuit_id", key="f_circuit_id"),
         "severity": st.text_input("severity", key="f_severity"),
-        "root_cause_category": st.text_input("root_cause_category", key="f_root_cause_category"),
-        "mitigation_action_taken": st.text_input("mitigation_action_taken", key="f_mitigation_action_taken"),
-        "estimated_restoration_time": st.text_input(
-            "estimated_restoration_time", key="f_estimated_restoration_time"
-        ),
         "next_update_window_minutes": st.number_input(
             "next_update_window_minutes", step=1, key="f_next_update_window_minutes"
-        ),
-        "notification_email_body": st.text_area(
-            "notification_email_body", key="f_notification_email_body", height=100
         ),
     }
 
 with right:
     st.subheader("Verdict")
-    # Layer 1: Pydantic schema
-    st.markdown("**Layer 1 · Pydantic schema**")
     try:
         draft = IncidentNotificationDraft(**edited)
     except ValidationError as exc:
-        st.badge("Rejected", icon=":material/close:", color="red")
+        st.badge("Schema rejected", icon=":material/close:", color="red")
         for err in exc.errors():
             st.error(f"`{'.'.join(map(str, err['loc']))}`: {err['msg']}", icon=":material/block:")
-        st.caption(
-            "In production, Instructor feeds this error back to the model and retries (max_retries=2)."
-        )
         st.stop()
-    st.badge("Valid", icon=":material/check:", color="green")
+    st.badge("Schema valid", icon=":material/check:", color="green")
     if draft.severity != str(edited["severity"]).strip().upper():
-        st.warning(
-            f"Severity `{edited['severity']}` is not an allowed level; the validator coerced it to "
-            f"`{draft.severity}` (fail-safe default).",
-            icon=":material/warning:",
-        )
+        st.warning(f"Severity coerced to `{draft.severity}` (fail-safe default).", icon=":material/warning:")
 
-    # Layer 2: deterministic guardrails
-    st.markdown("**Layer 2 · Deterministic gate**")
     alarm = AlarmPayload(
         incident_id=draft.incident_id,
         circuit_id=CIRCUIT_ID,
@@ -111,7 +88,6 @@ with right:
     except GuardrailViolation as exc:
         st.badge("Blocked (fail closed)", icon=":material/close:", color="red")
         st.error(str(exc))
-        st.caption("No customer email is released. A human operator takes over.")
     else:
         st.badge("Tenant isolation passed", icon=":material/check:", color="green")
         if checks["auto_remediated"]:
@@ -122,9 +98,3 @@ with right:
             )
         else:
             st.badge("SLA compliant", icon=":material/check:", color="green")
-        st.caption("Released to the operator for human review.")
-
-with st.expander("Pydantic output contract (JSON Schema)"):
-    st.json(IncidentNotificationDraft.model_json_schema(), expanded=False)
-with st.expander("Validated payload"):
-    st.code(json.dumps(draft.model_dump(), indent=2), language="json")
