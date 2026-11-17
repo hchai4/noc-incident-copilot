@@ -4,7 +4,7 @@ A grounded RAG copilot for network operations. It turns an incoming circuit alar
 
 The Streamlit UI is a human-in-the-loop (HITL) dispatch console: operators pick a circuit and alarm, review citations and the draft email, then confirm dispatch.
 
-**Live demo:** https://YOUR-APP-NAME.streamlit.app  (see [Public demo](#public-demo-streamlit-community-cloud) for the limits)
+**Live demo:** https://noc-incident-resolution-agent-667awhtpukh2guav6tipro.streamlit.app/  (see [Public demo](#public-demo-streamlit-community-cloud) for the limits)
 
 | Dispatch console | Eval dashboard | Guardrail lab |
 |---|---|---|
