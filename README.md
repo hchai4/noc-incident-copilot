@@ -28,7 +28,11 @@ The agent must not invent a restoration ETA. If field confirmation is missing, i
 ## Project layout
 
 ```
-app/app.py                      Streamlit HITL console
+app/app.py                      Streamlit router (st.navigation, 3 pages)
+app/app_pages/evals.py          Eval dashboard: DeepEval scores, failure analysis, retrieval ablation
+app/app_pages/guardrails.py     Guardrail lab: Pydantic validation + tenant/SLA gate, no LLM
+app/app_pages/console.py        Live HITL dispatch console (needs OPENAI_API_KEY + index)
+app/common.py                   Boot seeding, secrets bridge, report loader
 src/schemas.py                  AlarmPayload + IncidentNotificationDraft
 src/telemetry_db.py             SQLite circuit catalog (seed + lookup)
 src/rag/indexer.py              Split SOPs on numbered headers; embed sections + aliases
@@ -204,3 +208,34 @@ Implemented in `src/agent/guardrails.py`:
 
 - **Tenant isolation** — draft `client_name` / `circuit_id` must match the alarm and the SQL row. Mismatch raises `GuardrailViolation`.
 - **SLA cadence** — `next_update_window_minutes` must be ≤ `contracted_sla_hours * 60`. If not, the value is clamped and marked `auto_remediated`.
+
+## Deploy to Streamlit Community Cloud
+
+1. Push the repo, create an app with main file `app/app.py`.
+2. The **Eval dashboard** and **Guardrail lab** need no secrets: they read the committed
+   `evals/faithfulness_results.json` and run the Pydantic and guardrail code locally. The SQLite
+   catalog is seeded on first boot.
+3. The **Dispatch console** is disabled until `OPENAI_API_KEY` is set in app secrets and
+   `data/chroma_db` exists. `chroma_db` is gitignored, so build it before enabling live drafting.
+   A public app with a live key lets visitors spend your credits; keep it private or rate-limited.
+4. Refresh the dashboard by re-running `python -m evals.faithfulness_eval` and committing the JSON.
+
+## Public demo deployment (Streamlit Community Cloud)
+
+The Eval dashboard and Guardrail lab cost nothing to run (recorded results, no LLM), so they are open to everyone. Only the Dispatch console calls OpenAI, and it sits behind several layers (`app/guard.py`):
+
+| Layer | Setting | Default |
+|---|---|---|
+| Kill switch | `DEMO_LIVE_ENABLED` | `true` |
+| Access code (optional; unset = open to everyone) | `DEMO_ACCESS_CODE` | none |
+| Drafts per browser session | `DEMO_SESSION_LIMIT` | 5 |
+| Cooldown between drafts | `DEMO_COOLDOWN_SECONDS` | 10 |
+| Drafts per client IP per UTC day | `DEMO_CLIENT_DAILY_LIMIT` | 10 |
+| Drafts per UTC day, all visitors | `DEMO_DAILY_LIMIT` | 100 |
+| Free-text telemetry length | `DEMO_MAX_INPUT_CHARS` | 500 |
+
+Key safety:
+1. Create a **dedicated OpenAI project** for the demo and set a small monthly budget (Settings > Limits). This is the real backstop: the in-app counters live in process memory and reset on restart.
+2. Paste secrets only into Streamlit Cloud > App > Settings > Secrets (template: `.streamlit/secrets.toml.example`). `.env` and `.streamlit/secrets.toml` are gitignored; the key is never sent to the browser or shown in errors.
+3. Deploy from `app/app.py` on `main`. On first boot the app seeds the SQLite catalog and builds the Chroma index (a few cents of embeddings).
+4. Rotate the key if it was ever pasted anywhere public.
