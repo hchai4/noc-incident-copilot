@@ -34,7 +34,11 @@ The agent must not invent a restoration ETA. If field confirmation is missing, i
 ## Project layout
 
 ```
-app/app.py                      Streamlit HITL console
+app/app.py                      Streamlit router (st.navigation, 3 pages)
+app/app_pages/evals.py          Eval dashboard: DeepEval scores, failure analysis, retrieval ablation
+app/app_pages/guardrails.py     Guardrail lab: Pydantic validation + tenant/SLA gate, no LLM
+app/app_pages/console.py        Live HITL dispatch console (needs OPENAI_API_KEY + index)
+app/common.py                   Boot seeding, secrets bridge, report loader
 src/schemas.py                  AlarmPayload + IncidentNotificationDraft
 src/telemetry_db.py             SQLite circuit catalog (seed + lookup)
 src/rag/indexer.py              Split SOPs on numbered headers; embed sections + aliases
@@ -210,3 +214,36 @@ Implemented in `src/agent/guardrails.py`:
 
 - **Tenant isolation** — draft `client_name` / `circuit_id` must match the alarm and the SQL row. Mismatch raises `GuardrailViolation`.
 - **SLA cadence** — `next_update_window_minutes` must be ≤ `contracted_sla_hours * 60`. If not, the value is clamped and marked `auto_remediated`.
+
+## Public demo (Streamlit Community Cloud)
+
+Anyone can open the demo with no login and no access code. It has three tabs:
+
+- **Dispatch console** (live): drafts an incident email with `gpt-4o-mini` using retrieved runbooks. This is the only tab that calls OpenAI.
+- **Eval dashboard**: DeepEval scores from a saved offline run of 5 scenarios (`evals/faithfulness_results.json`). Nothing is recomputed in the browser.
+- **Guardrail lab**: Pydantic validation and the tenant/SLA gate on an editable draft. No LLM, no cost.
+
+**Demo conditions.** The live console is rate-limited so a public link cannot run up the bill (`app/guard.py`):
+
+| Limit | Setting | Value |
+|---|---|---|
+| Drafts per browser session | `DEMO_SESSION_LIMIT` | 5 |
+| Cooldown between drafts | `DEMO_COOLDOWN_SECONDS` | 10 s |
+| Drafts per client IP per UTC day | `DEMO_CLIENT_DAILY_LIMIT` | 10 |
+| Drafts per UTC day, all visitors | `DEMO_DAILY_LIMIT` | 100 |
+| Telemetry text length | `DEMO_MAX_INPUT_CHARS` | 500 chars |
+| Kill switch | `DEMO_LIVE_ENABLED` | `true` |
+| Optional access code | `DEMO_ACCESS_CODE` | unset (open) |
+
+- Once the daily budget is used up, the live console pauses until 00:00 UTC; the other two tabs keep working.
+- Drafts are for demonstration only. No email is ever sent, and the app does not save what you type.
+- Counters are in memory, so an app restart resets them. The hard backstop is a monthly budget cap on the OpenAI project that owns the key.
+- The app may sleep when idle; the first visit after a sleep takes a minute to wake and, on a cold start, to rebuild the vector index.
+
+### Deploy your own copy
+
+1. Create a **dedicated OpenAI project** with a small monthly budget (Settings > Limits) and a separate API key.
+2. On [share.streamlit.io](https://share.streamlit.io) create an app from this repo with main file `app/app.py` and Python 3.12.
+3. Paste secrets in App > Settings > Secrets (template: `.streamlit/secrets.toml.example`). `.env` and `.streamlit/secrets.toml` are gitignored; the key stays server-side and is never shown in errors.
+4. On first boot the app seeds the SQLite catalog and builds the Chroma index (a few cents of embeddings).
+5. Refresh the dashboard by re-running `python -m evals.faithfulness_eval` and committing the JSON.
