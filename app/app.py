@@ -22,14 +22,14 @@ st.caption(
     "quality is measured."
 )
 
-page = st.navigation(
-    [
-        st.Page(
-            "app_pages/console.py", title="Dispatch console", icon=":material/support_agent:", default=True
-        ),
-        st.Page("app_pages/evals.py", title="Eval dashboard", icon=":material/fact_check:"),
-        st.Page("app_pages/guardrails.py", title="Guardrail lab", icon=":material/shield:"),
-    ],
-    position="top",
-)
+pages = [
+    st.Page("app_pages/console.py", title="Dispatch console", icon=":material/support_agent:", default=True),
+    st.Page("app_pages/evals.py", title="Eval dashboard", icon=":material/fact_check:"),
+    st.Page("app_pages/guardrails.py", title="Guardrail lab", icon=":material/shield:"),
+]
+# Built-in top nav always renders above page content, so hide it and draw the tabs under the header.
+page = st.navigation(pages, position="hidden")
+with st.container(horizontal=True):
+    for p in pages:
+        st.page_link(p, width="content")
 page.run()
