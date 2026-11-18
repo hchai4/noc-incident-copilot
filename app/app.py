@@ -20,7 +20,7 @@ from ulid import ULID
 load_dotenv()
 
 # Page configuration
-st.set_page_config(page_title="NOC Incident Copilot | Enterprise Dispatch", page_icon="📡", layout="wide")
+st.set_page_config(page_title="NOC Incident Copilot", page_icon="📡", layout="wide")
 
 # Custom Styling for enterprise look
 st.markdown(
@@ -67,7 +67,7 @@ def fetch_all_circuits():
 
 
 # Header
-st.title("📡 NOC Incident Resolution & Dispatch Copilot")
+st.title("📡 NOC Incident Copilot")
 st.caption("Grounded enterprise RAG | Human-in-the-loop dispatch")
 st.divider()
 
