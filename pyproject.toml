@@ -1,5 +1,5 @@
 [project]
-name = "noc-incident-resolution-agent"
+name = "noc-incident-copilot"
 version = "0.1.0"
 description = "Grounded RAG copilot for NOC incident drafts"
 readme = "README.md"
