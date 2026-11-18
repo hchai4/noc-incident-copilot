@@ -12,10 +12,10 @@ from dotenv import load_dotenv
 from common import bootstrap
 
 load_dotenv()
-st.set_page_config(page_title="NOC Incident Resolution Agent", page_icon=":material/lan:", layout="wide")
+st.set_page_config(page_title="NOC Incident Copilot", page_icon=":material/lan:", layout="wide")
 bootstrap()
 
-st.header("NOC Incident Resolution Agent", divider="gray")
+st.header("NOC Incident Copilot", divider="gray")
 st.caption(
     "An AI copilot that turns a network alarm into a customer-ready incident email, grounded in runbooks and "
     "checked by safety guardrails before a human reviews it. Try the live console, then see how its "
