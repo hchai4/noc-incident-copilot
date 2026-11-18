@@ -1,10 +1,10 @@
-# NOC Incident Resolution Agent
+# NOC Incident Copilot
 
 A grounded RAG copilot for network operations. It turns an incoming circuit alarm into an SLA-compliant customer incident draft, using SQL telemetry as ground truth, SOP runbooks as retrieval context, and deterministic guardrails before anything is shown to an operator.
 
 The Streamlit UI is a human-in-the-loop (HITL) dispatch console: operators pick a circuit and alarm, review citations and the draft email, then confirm dispatch.
 
-**Live demo:**[NOC-Incident-Resolution-Agent](https://noc-incident-resolution-agent-667awhtpukh2guav6tipro.streamlit.app/)   (see [Public demo](#public-demo-streamlit-community-cloud) for the limits)
+**Live demo:**[NOC-Incident-Copilot](https://noc-incident-resolution-agent-667awhtpukh2guav6tipro.streamlit.app/)   (see [Public demo](#public-demo-streamlit-community-cloud) for the limits)
 
 | Dispatch console | Eval dashboard | Guardrail lab |
 |---|---|---|
@@ -29,7 +29,7 @@ AlarmPayload
           Tenant isolation (fail hard) + SLA update-window clamp (auto-remediate)
 ```
 
-The agent must not invent a restoration ETA. If field confirmation is missing, it schedules the next update within the customer's contracted window instead.
+The copilot must not invent a restoration ETA. If field confirmation is missing, it schedules the next update within the customer's contracted window instead.
 
 ## Project layout
 
@@ -95,7 +95,7 @@ SOP corpus is 20 runbooks in `data/noc_runbooks/`. Four of them are near-neighbo
 | `sop_customer_cpe_down.md` | Last-mile CPE |
 | `sop_ixp_port_down.md` | Exchange switch port |
 
-After the 5→20 expansion, whole-document retrieval ranked a BGP leak query as `sop_bgp_session_flap.md`. Header chunks plus small-to-big (10/22) raised hit@1. Hybrid BM25 + RRF (10/23) fuses lexical ranks with dense ranks; on this set hit@1 did not beat 10/22. Cross-encoder rerank on the RRF shortlist (10/24) recovered hit@1 to 0.857. With `RETRIEVAL_ABSTAIN_THRESHOLD=0.5`, all ten negatives return no SOP; the agent then tells the LLM there is no matching runbook and to escalate.
+After the 5→20 expansion, whole-document retrieval ranked a BGP leak query as `sop_bgp_session_flap.md`. Header chunks plus small-to-big (10/22) raised hit@1. Hybrid BM25 + RRF (10/23) fuses lexical ranks with dense ranks; on this set hit@1 did not beat 10/22. Cross-encoder rerank on the RRF shortlist (10/24) recovered hit@1 to 0.857. With `RETRIEVAL_ABSTAIN_THRESHOLD=0.5`, all ten negatives return no SOP; the pipeline then tells the LLM there is no matching runbook and to escalate.
 
 ## Prerequisites
 
@@ -168,9 +168,9 @@ T=0.5 is from the CE lists: 34 positives ≥ 0.97, one at -0.45; leftover negati
 
 ## Evaluation (faithfulness)
 
-Retrieval metrics only check filenames. `evals/faithfulness_eval.py` runs the **whole agent** (retrieval at T=0.5 → `gpt-4o-mini` draft → guardrails) on the 5 alarms in `evals/faithfulness_scenarios.jsonl` — one per supported alarm type plus one billing question that must abstain — and judges the customer email with DeepEval on `gpt-4o-mini`:
+Retrieval metrics only check filenames. `evals/faithfulness_eval.py` runs the **whole pipeline** (retrieval at T=0.5 → `gpt-4o-mini` draft → guardrails) on the 5 alarms in `evals/faithfulness_scenarios.jsonl` — one per supported alarm type plus one billing question that must abstain — and judges the customer email with DeepEval on `gpt-4o-mini`:
 
-- **Faithfulness**: every claim in the email is supported by the SOP text the agent actually retrieved. 1.0 = fully grounded.
+- **Faithfulness**: every claim in the email is supported by the SOP text the pipeline actually retrieved. 1.0 = fully grounded.
 - **Factual alignment** (DeepEval `HallucinationMetric`): the email does not contradict SOP + telemetry. This metric also penalizes **omitting** a context fact, so it reads lower than faithfulness.
 
 ```bash
