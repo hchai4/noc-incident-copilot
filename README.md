@@ -178,7 +178,7 @@ uv run python -m src.telemetry_db                      # once; seeds circuits
 RETRIEVAL_ABSTAIN_THRESHOLD=0.5 PYTHONPATH=. uv run python evals/faithfulness_eval.py
 ```
 
-Each run costs 5 drafts + 10 judge calls and overwrites `evals/faithfulness_results.json` with per-scenario scores, judge reasons, cited files, guardrail flags, and a UTC timestamp. That JSON is committed on purpose: the Streamlit console reads it and CI has no OpenAI key.
+Each run costs 5 drafts + 10 judge calls and overwrites `evals/faithfulness_results.json` with per-scenario scores, judge reasons, cited files, guardrail flags, and a UTC timestamp. That JSON is committed on purpose: the Streamlit console reads it, and PR checks gate on it without needing an OpenAI key (see [CI](#ci-eval-regression-gate)).
 
 Run of 2026-10-26 (judge `gpt-4o-mini`, threshold 0.85, T=0.5):
 
@@ -206,7 +206,23 @@ RETRIEVAL_ABSTAIN_THRESHOLD=0.5 PYTHONPATH=. uv run python evals/faithfulness_ev
 
 `pytest.ini` sets `pythonpath = .` so `src.*` imports resolve from the repo root. The metrics scripts do not read `pytest.ini`; that is why `PYTHONPATH=.` is required.
 
-`tests/test_rag_evals.py` uses the same DeepEval metrics and 0.85 threshold as `evals/faithfulness_eval.py`, on two alarms (fiber cut, BGP leak), and fails the test instead of writing a file. Both call the live model and consume OpenAI quota; neither runs in CI.
+`tests/test_rag_evals.py` uses the same DeepEval metrics and 0.85 threshold as `evals/faithfulness_eval.py`, on two alarms (fiber cut, BGP leak), and fails the test instead of writing a file. Both call the live model and consume OpenAI quota; neither runs in CI (the `live-eval` job runs `faithfulness_eval.py` instead).
+
+## CI eval regression gate
+
+`.github/workflows/eval-regression.yml` runs `evals/check_thresholds.py`, which exits non-zero (failing the check) if any gate is missed:
+
+| Gate | Required |
+|---|---|
+| Faithfulness mean | >= 0.85 |
+| Faithfulness min (any scenario) | >= 0.75 |
+| Factual alignment mean | >= 0.50 |
+| Retrieval correct / guardrails passed | all scenarios |
+
+- **`offline-gate`** (every PR and push to `main`, no secrets): `tests/test_guardrails.py`, then the gate on the committed `evals/faithfulness_results.json`.
+- **`live-eval`** (push to `main`, weekly Monday 03:00 UTC, or manual dispatch): re-runs `faithfulness_eval.py` with the `OPENAI_API_KEY` repo secret, gates the fresh results, and uploads the JSON as an artifact. Not run on PRs.
+
+Thresholds can be overridden with flags, e.g. `python evals/check_thresholds.py --faithfulness-mean 0.9`.
 
 ## Guardrails
 
