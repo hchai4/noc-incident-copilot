@@ -1,5 +1,7 @@
 # NOC Incident Copilot
 
+[![Eval regression](https://github.com/hchai4/noc-incident-copilot/actions/workflows/eval-regression.yml/badge.svg?branch=main)](https://github.com/hchai4/noc-incident-copilot/actions/workflows/eval-regression.yml)
+
 A grounded RAG copilot for network operations. It turns an incoming circuit alarm into an SLA-compliant customer incident draft, using SQL telemetry as ground truth, SOP runbooks as retrieval context, and deterministic guardrails before anything is shown to an operator.
 
 The Streamlit UI is a human-in-the-loop (HITL) dispatch console: operators pick a circuit and alarm, review citations and the draft email, then confirm dispatch.
