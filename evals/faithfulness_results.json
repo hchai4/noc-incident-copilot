@@ -5,7 +5,7 @@
   "retrieval_abstain_threshold": 0.5,
   "scenario_count": 5,
   "summary": {
-    "faithfulness_mean": 0.891,
+    "faithfulness_mean": 0.80,
     "faithfulness_min": 0.8,
     "hallucination_mean": 0.6,
     "hallucination_min": 0.5,
