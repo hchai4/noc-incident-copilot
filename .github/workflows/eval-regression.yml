@@ -1,0 +1,71 @@
+name: Eval regression
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * 1"   # weekly live run (Mon 03:00 UTC)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast, no secrets: guardrail tests + gate on the committed report.
+  offline-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv sync --frozen
+      - name: Guardrail unit tests (no LLM)
+        run: uv run pytest -v tests/test_guardrails.py
+      - name: Threshold gate on committed report
+        run: uv run python evals/check_thresholds.py
+
+  # Live eval: calls OpenAI, so only on main / schedule / manual run.
+  live-eval:
+    if: github.event_name != 'pull_request'
+    needs: offline-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      RETRIEVAL_ABSTAIN_THRESHOLD: "0.5"
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv sync --frozen
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+      - name: Require API key
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::error::OPENAI_API_KEY secret is not configured"; exit 1
+          fi
+      - name: Seed telemetry DB
+        run: uv run python -m src.telemetry_db
+      - name: Run faithfulness eval
+        run: uv run python evals/faithfulness_eval.py
+      - name: Threshold gate on fresh results
+        run: uv run python evals/check_thresholds.py
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: faithfulness-results
+          path: evals/faithfulness_results.json
